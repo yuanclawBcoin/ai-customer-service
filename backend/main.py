@@ -315,9 +315,9 @@ async def handle_tg_message(account_id: int, message):
         if user_id not in handle_tg_message.user_memories:
             memory_system = MemorySystem()
 
-            # 从数据库加载该用户的历史记忆
+            # 从数据库加载该用户的历史记忆（按人设ID查询）
             from models.database import get_memories
-            db_memories = get_memories(user_id, account_id)
+            db_memories = get_memories(user_id, persona_id)  # 用persona_id而不是account_id
             for mem in db_memories:
                 from ai_engine.memory import Memory
                 memory_system.add_long_term(Memory(
@@ -404,7 +404,7 @@ async def handle_tg_message(account_id: int, message):
             conversation = f"用户: {user_message}\n助手: {response}"
             extracted_memories = await MemoryExtractor.extract(conversation, generator)
             for mem in extracted_memories:
-                save_user_memory(user_id, account_id, mem)
+                save_user_memory(user_id, persona_id, mem)  # 用persona_id而不是account_id
                 memory_system.add_long_term(mem)
 
             # 提取讨论话题

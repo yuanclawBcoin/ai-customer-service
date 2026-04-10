@@ -22,7 +22,6 @@ class ReplyGenerator:
         self,
         system_prompt: str,
         messages: List[Dict],
-        context: str = "",
         temperature: float = 0.8,
         max_tokens: int = 500,
         persona_habits: Dict = None
@@ -35,10 +34,8 @@ class ReplyGenerator:
         # 构建消息
         full_messages = []
 
-        # 系统提示词
+        # 系统提示词（已包含context）
         system_content = system_prompt
-        if context:
-            system_content += f"\n\n【已知信息】\n{context}"
 
         # 加入人设习惯
         if persona_habits:
