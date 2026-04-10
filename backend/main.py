@@ -270,9 +270,8 @@ async def auto_start_telegram():
 async def handle_tg_message(account_id: int, message):
     """处理 Telegram 消息"""
     try:
-        from models.database import get_tg_accounts, get_persona, get_emotion, update_emotion
+        from models.database import get_tg_accounts, get_persona
         from ai_engine.generator import get_generator
-        import json
         
         # 获取账号配置
         accounts = get_tg_accounts()
@@ -306,12 +305,16 @@ async def handle_tg_message(account_id: int, message):
         if message.text:
             messages.append({"role": "user", "content": message.text})
         
+        # 构建系统提示词
+        from ai_engine.persona import Persona
+        persona_obj = Persona(persona)
+        system_prompt = persona_obj.get_system_prompt()
+        
         # 调用 AI 生成回复
         generator = get_generator()
         response = await generator.generate(
-            persona=persona,
-            messages=messages,
-            user_id=user_id
+            system_prompt=system_prompt,
+            messages=messages
         )
         
         if response:

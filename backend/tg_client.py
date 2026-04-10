@@ -231,7 +231,7 @@ async def start_all_clients():
     
     accounts = get_tg_accounts()
     for account in accounts:
-        if account.get("status") == "active":
+        if account.get("status") in ("active", "online"):
             client = TelegramClient(account["id"])
             success = await client.start()
             if success:
