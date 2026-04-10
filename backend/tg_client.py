@@ -56,20 +56,14 @@ class TelegramClient:
         try:
             # 标记消息为已读
             try:
-                # 方式1: view_messages (推荐)
-                await client.view_messages(
-                    chat_id=message.chat.id,
-                    message_ids=message.id
-                )
+                # 方式1: 直接在message对象上调用mark_read
+                await message.mark_read()
             except Exception as e1:
-                # 方式2: send_read_acknowledge
+                # 方式2: 尝试read_history
                 try:
-                    await client.send_read_acknowledge(
-                        chat_id=message.chat.id,
-                        max_id=message.id
-                    )
+                    await client.read_history(chat_id=message.chat.id, max_id=message.id)
                 except Exception as e2:
-                    print(f"[TG-{self.account_id}] 标记已读失败: view={e1}, ack={e2}")
+                    print(f"[TG-{self.account_id}] 标记已读失败: mark={e1}, read={e2}")
 
             from backend.main import handle_tg_message
             await handle_tg_message(self.account_id, message)
