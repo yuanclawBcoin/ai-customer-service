@@ -214,11 +214,9 @@ def get_memories(user_id: str, persona_id: int = None) -> List[dict]:
     c = conn.cursor()
     if persona_id:
         c.execute("""SELECT * FROM memories WHERE user_id = ? AND persona_id = ?
-                     AND (expires_at IS NULL OR expires_at > datetime('now'))
                      ORDER BY is_pinned DESC, created_at DESC""", (user_id, persona_id))
     else:
         c.execute("""SELECT * FROM memories WHERE user_id = ?
-                     AND (expires_at IS NULL OR expires_at > datetime('now'))
                      ORDER BY is_pinned DESC, created_at DESC""", (user_id,))
     rows = [dict(row) for row in c.fetchall()]
     conn.close()
@@ -233,25 +231,44 @@ def add_memory(user_id: str, content: str, persona_id: int = None,
     conn.commit()
     conn.close()
 
-def save_user_memory(user_id: str, account_id: int, memory):
-    """保存从AI提取的用户记忆"""
+def save_user_memory(user_id: str, persona_id: int, memory):
+    """保存从AI提取的用户记忆（按类别去重）"""
     conn = get_conn()
     c = conn.cursor()
-    
+
     # 检查是否已存在相似记忆
     content = memory.content if hasattr(memory, 'content') else str(memory)
     category = getattr(memory, 'category', 'general')
     importance = getattr(memory, 'importance', 'normal')
-    
-    c.execute("SELECT id FROM memories WHERE user_id = ? AND content = ?", (user_id, content))
-    existing = c.fetchone()
-    
-    if not existing:
-        c.execute("""INSERT INTO memories (user_id, persona_id, content, category, importance)
-                     VALUES (?, ?, ?, ?, ?)""",
-                  (user_id, account_id, content, category, importance))
-        conn.commit()
-    
+
+    # 对于重要类别（name, preference, fact），同类别只保留一条
+    if category in ['name', 'preference', 'fact']:
+        # 检查是否已存在同类别记忆
+        c.execute("""SELECT id, content FROM memories
+                     WHERE user_id = ? AND persona_id = ? AND category = ?""",
+                  (user_id, persona_id, category))
+        existing = c.fetchone()
+
+        if existing:
+            # 更新旧记忆
+            c.execute("""UPDATE memories SET content = ?, importance = ?, created_at = CURRENT_TIMESTAMP
+                         WHERE id = ?""", (content, importance, existing[0]))
+        else:
+            # 插入新记忆
+            c.execute("""INSERT INTO memories (user_id, persona_id, content, category, importance)
+                         VALUES (?, ?, ?, ?, ?)""",
+                      (user_id, persona_id, content, category, importance))
+    else:
+        # 其他类别用内容匹配去重
+        c.execute("SELECT id FROM memories WHERE user_id = ? AND content = ?", (user_id, content))
+        existing = c.fetchone()
+
+        if not existing:
+            c.execute("""INSERT INTO memories (user_id, persona_id, content, category, importance)
+                         VALUES (?, ?, ?, ?, ?)""",
+                      (user_id, persona_id, content, category, importance))
+
+    conn.commit()
     conn.close()
 
 # 情绪相关

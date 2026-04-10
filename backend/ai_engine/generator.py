@@ -43,6 +43,12 @@ class ReplyGenerator:
             if habits:
                 habits_text = "、".join(habits)
                 system_content += f"\n\n【你的说话习惯】可以适当使用这些口头禅：{habits_text}"
+
+            # 加入常用emoji
+            emojis = persona_habits.get("favorite_emoji", [])
+            if emojis:
+                emoji_text = "、".join(emojis)
+                system_content += f"\n\n【你的常用emoji】{emoji_text}（偶尔使用，不要每句都用）"
         
         full_messages.append({
             "role": "system",

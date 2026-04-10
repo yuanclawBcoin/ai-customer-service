@@ -94,6 +94,8 @@ class EmotionEngine:
         # 根据情绪更新AI状态
         self._update_ai_emotion(emotion, prev_emotion)
 
+        return emotion  # 返回分析的情绪
+
     def _update_ai_emotion(self, user_emotion: str, prev_emotion: str):
         """根据用户情绪深度更新AI情绪"""
         roll = random.random()
@@ -202,8 +204,8 @@ class EmotionEngine:
             delay = base_delay + random.uniform(0.3, 1.8)
 
         # AI情绪也影响延迟
-        if self.ai_emotion == "thinking":
-            delay += random.uniform(0.5, 1.0)
+        if self.ai_emotion == "worried":
+            delay += random.uniform(0.3, 0.8)  # 担心时思考久一点
         elif self.ai_emotion == "excited":
             delay -= 0.2  # 兴奋打字快
 

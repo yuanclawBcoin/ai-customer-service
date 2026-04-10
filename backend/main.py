@@ -330,9 +330,7 @@ async def handle_tg_message(account_id: int, message):
 
         emotion_engine = handle_tg_message.user_emotions[user_id]
         memory_system = handle_tg_message.user_memories[user_id]
-
-        # 分析用户情绪（双向互动）
-        user_emotion = emotion_engine.analyze_text(user_message)
+        # 分析用户情绪（update内部会调用analyze_text）
         emotion_engine.update(user_message)
 
         # 获取AI的情绪状态
@@ -372,6 +370,12 @@ async def handle_tg_message(account_id: int, message):
         context = memory_system.get_context_for_ai()
         if context:
             system_prompt += f"\n\n{context}"
+
+        # 加入讨论过的话题上下文
+        if user_id in handle_tg_message.user_topics:
+            topics = list(handle_tg_message.user_topics[user_id].keys())
+            if topics:
+                system_prompt += f"\n\n【你们之前聊过的话题】{', '.join(topics[:5])}"
 
         # 加入情绪上下文
         emotion_context = emotion_engine.get_context_for_ai()
