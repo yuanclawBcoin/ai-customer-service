@@ -170,14 +170,23 @@ class TelegramClient:
                 api_hash=self.api_hash
             )
             
+            # 注册消息处理器
+            from pyrogram import filters
+            self.client.add_handler(
+                MessageHandler(self._handle_message, filters.private & ~filters.bot),
+                group=0
+            )
+            
             await self.client.start()
             self._connected = True
             self.running = True
-            print(f"[TG-{self.account_id}] Telegram 已连接")
+            print(f"[TG-{self.account_id}] Telegram 已连接并开始监听消息")
             return True
             
         except Exception as e:
             print(f"[TG-{self.account_id}] 连接失败: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     async def stop(self):
