@@ -3,6 +3,7 @@ AI 客服系统 - FastAPI 主入口
 """
 import asyncio
 import os
+import random
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -409,18 +410,28 @@ async def handle_tg_message(account_id: int, message):
         )
 
         if response:
-            # 模拟真人打字延迟
-            typing_delay = emotion_engine.get_typing_delay()
-            await asyncio.sleep(typing_delay)
-
             # 模拟真人偶尔打错字
             response = emotion_engine.simulate_typo(response)
 
-            # 发送回复
-            await message.reply(response)
+            # 长消息分段发送（模拟真人打字习惯）
+            message_chunks = split_message(response)
 
-            # 添加AI回复到记忆
-            memory_system.add_short_term("assistant", response, persona_id)
+            for i, chunk in enumerate(message_chunks):
+                # 每条消息之间的延迟
+                if i > 0:
+                    # 分段发送时，段与段之间等待2-4秒（真人打字需要时间）
+                    await asyncio.sleep(random.uniform(2.0, 4.0))
+
+                # 模拟打字延迟（根据消息长度）
+                typing_delay = emotion_engine.get_typing_delay() * (len(chunk) / 50)
+                typing_delay = max(0.5, min(typing_delay, 3.0))  # 限制在0.5-3秒
+                await asyncio.sleep(typing_delay)
+
+                # 发送这条消息
+                await message.reply(chunk)
+
+                # 每条消息都加入记忆
+                memory_system.add_short_term("assistant", chunk, persona_id)
 
             # 用AI提取重要信息并存入数据库
             conversation = f"用户: {user_message}\n助手: {response}"
@@ -484,6 +495,52 @@ async def extract_topic(text: str, generator) -> str:
     except:
         pass
     return ""
+
+
+def split_message(text: str, max_length: int = 200) -> list:
+    """将长消息拆分成短消息（模拟真人打字习惯）"""
+    if not text or len(text) <= max_length:
+        return [text] if text else []
+
+    # 按句子拆分
+    import re
+    sentences = re.split(r'([。！？.!?]+)', text)
+    chunks = []
+    current_chunk = ""
+
+    for i, part in enumerate(sentences):
+        if not part.strip():
+            continue
+
+        # 如果当前片段加上这个句子超过长度限制，先保存当前chunk
+        if len(current_chunk) + len(part) > max_length and current_chunk:
+            chunks.append(current_chunk.strip())
+            current_chunk = ""
+
+        current_chunk += part
+
+        # 如果遇到句末标点，且当前chunk有内容，保存
+        if i % 2 == 1 and current_chunk.strip():
+            # 句子结束，检查是否需要保存
+            if len(current_chunk) > max_length * 0.8:
+                chunks.append(current_chunk.strip())
+                current_chunk = ""
+
+    # 保存剩余的chunk
+    if current_chunk.strip():
+        chunks.append(current_chunk.strip())
+
+    # 如果拆分后超过3条，进一步合并
+    while len(chunks) > 3 and max_length < 400:
+        # 合并最后两条
+        if len(chunks) >= 2:
+            chunks[-2] = chunks[-2] + chunks[-1]
+            chunks.pop()
+        else:
+            break
+
+    return chunks if chunks else [text]
+
 
 # ============ 错误处理 ============
 
