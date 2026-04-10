@@ -51,6 +51,16 @@ class TelegramClient:
                 os.makedirs(sessions_dir, exist_ok=True)
                 self.session_path = os.path.join(sessions_dir, f"{self.session_name}.session")
     
+    async def _handle_message(self, client, message):
+        """处理收到的消息"""
+        try:
+            from backend.main import handle_tg_message
+            await handle_tg_message(self.account_id, message)
+        except Exception as e:
+            print(f"[TG-{self.account_id}] 处理消息失败: {e}")
+            import traceback
+            traceback.print_exc()
+    
     async def send_code(self, phone_number: str) -> dict:
         """发送验证码"""
         try:
@@ -114,14 +124,22 @@ class TelegramClient:
                 else:
                     raise
 
+            # 注册消息处理器
+            from pyrogram import filters
+            self.client.add_handler(
+                MessageHandler(self._handle_message, filters.private & ~filters.bot),
+                group=0
+            )
+            
             # session 会在 disconnect 时自动保存
             self._connected = True
             self.running = True
+            
+            # 注册到全局客户端（保持连接用于监听）
+            set_client(self.account_id, self)
 
-            # 清理待验证状态
+            # 清理待验证状态（不断开client，因为要保持监听）
             if self.account_id in _pending_auth:
-                if _pending_auth[self.account_id].client:
-                    await _pending_auth[self.account_id].client.disconnect()
                 del _pending_auth[self.account_id]
 
             return {"success": True, "message": "登录成功"}

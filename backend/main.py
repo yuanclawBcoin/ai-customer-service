@@ -260,12 +260,71 @@ async def get_emotion_state(user_id: str, persona_id: int = None):
 # ============ 辅助函数 ============
 
 async def auto_start_telegram():
-    """自动启动 Telegram"""
-    await asyncio.sleep(2)  # 等待配置加载
+    """自动启动 Telegram 客户端"""
     try:
+        await asyncio.sleep(2)  # 等待数据库初始化
         await start_all_clients()
     except Exception as e:
         print(f"自动启动 Telegram 失败: {e}")
+
+async def handle_tg_message(account_id: int, message):
+    """处理 Telegram 消息"""
+    try:
+        from models.database import get_tg_accounts, get_persona, get_emotion, update_emotion
+        from ai_engine.generator import get_generator
+        import json
+        
+        # 获取账号配置
+        accounts = get_tg_accounts()
+        account = next((a for a in accounts if a["id"] == account_id), None)
+        if not account:
+            print(f"[TG-{account_id}] 账号未找到")
+            return
+        
+        # 检查是否开启自动回复
+        if not account.get("auto_reply"):
+            print(f"[TG-{account_id}] 自动回复已关闭")
+            return
+        
+        # 获取人设
+        persona_id = account.get("persona_id")
+        if not persona_id:
+            print(f"[TG-{account_id}] 未绑定人设")
+            return
+        
+        persona = get_persona(persona_id)
+        if not persona:
+            print(f"[TG-{account_id}] 人设未找到: {persona_id}")
+            return
+        
+        # 获取对话历史
+        chat_id = message.chat.id
+        user_id = message.from_user.id
+        
+        # 构建消息列表
+        messages = []
+        if message.text:
+            messages.append({"role": "user", "content": message.text})
+        
+        # 调用 AI 生成回复
+        generator = get_generator()
+        response = await generator.generate(
+            persona=persona,
+            messages=messages,
+            user_id=user_id
+        )
+        
+        if response:
+            # 发送回复
+            await message.reply(response)
+            print(f"[TG-{account_id}] 已回复用户 {user_id}: {response[:50]}...")
+        else:
+            print(f"[TG-{account_id}] AI 未生成回复")
+            
+    except Exception as e:
+        print(f"[TG-{account_id}] 处理消息异常: {e}")
+        import traceback
+        traceback.print_exc()
 
 # ============ 错误处理 ============
 
