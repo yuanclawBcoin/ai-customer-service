@@ -272,6 +272,8 @@ async def handle_tg_message(account_id: int, message):
     try:
         from models.database import get_tg_accounts, get_persona
         from ai_engine.generator import get_generator
+        from ai_engine.emotion import EmotionEngine
+        from ai_engine.memory import MemorySystem
         
         # 获取账号配置
         accounts = get_tg_accounts()
@@ -296,31 +298,77 @@ async def handle_tg_message(account_id: int, message):
             print(f"[TG-{account_id}] 人设未找到: {persona_id}")
             return
         
-        # 获取对话历史
+        # 获取用户信息
         chat_id = message.chat.id
-        user_id = message.from_user.id
+        user_id = str(message.from_user.id)
+        user_message = message.text or ""
         
-        # 构建消息列表
+        # 初始化情绪引擎和记忆系统（每个用户独立）
+        emotion_key = f"emotion_{user_id}"
+        memory_key = f"memory_{user_id}"
+        
+        if not hasattr(handle_tg_message, 'user_emotions'):
+            handle_tg_message.user_emotions = {}
+        if not hasattr(handle_tg_message, 'user_memories'):
+            handle_tg_message.user_memories = {}
+        
+        if user_id not in handle_tg_message.user_emotions:
+            handle_tg_message.user_emotions[user_id] = EmotionEngine()
+        if user_id not in handle_tg_message.user_memories:
+            handle_tg_message.user_memories[user_id] = MemorySystem()
+        
+        emotion_engine = handle_tg_message.user_emotions[user_id]
+        memory_system = handle_tg_message.user_memories[user_id]
+        
+        # 分析用户情绪
+        emotion_engine.update(user_message)
+        
+        # 检查是否应该忽略（模拟真人偶尔不回复）
+        if emotion_engine.should_ignore():
+            print(f"[TG-{account_id}] 情绪激动，暂时不回复用户 {user_id}")
+            return
+        
+        # 判断是否是第一条消息
+        is_first_message = len(memory_system.short_term) == 0
+        
+        # 添加用户消息到记忆
+        memory_system.add_short_term("user", user_message, persona_id)
+        
+        # 构建消息列表（包含对话历史）
         messages = []
-        if message.text:
-            messages.append({"role": "user", "content": message.text})
+        for msg in memory_system.short_term[-10:]:
+            messages.append({"role": msg["role"], "content": msg["content"]})
         
         # 构建系统提示词
         from ai_engine.persona import Persona
         persona_obj = Persona(persona)
-        system_prompt = persona_obj.get_system_prompt()
+        
+        # 只有第一条消息才加开场白
+        emotion_style = emotion_engine.get_style_modifier()
+        system_prompt = persona_obj.get_system_prompt(emotion_style)
+        
+        if is_first_message:
+            system_prompt += f"\n\n【开场白】{persona_obj.get_greeting()}"
+        
+        # 加入记忆上下文
+        context = memory_system.get_context_for_ai()
         
         # 调用 AI 生成回复
         generator = get_generator()
         response = await generator.generate(
             system_prompt=system_prompt,
-            messages=messages
+            messages=messages,
+            context=context
         )
         
         if response:
             # 发送回复
             await message.reply(response)
-            print(f"[TG-{account_id}] 已回复用户 {user_id}: {response[:50]}...")
+            
+            # 添加AI回复到记忆
+            memory_system.add_short_term("assistant", response, persona_id)
+            
+            print(f"[TG-{account_id}] [{emotion_engine.current_emotion}] 已回复用户 {user_id}: {response[:50]}...")
         else:
             print(f"[TG-{account_id}] AI 未生成回复")
             
