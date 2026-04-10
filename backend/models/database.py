@@ -155,13 +155,16 @@ def get_persona(id: int) -> Optional[dict]:
 def create_persona(data: dict) -> int:
     conn = get_conn()
     c = conn.cursor()
-    c.execute("""INSERT INTO personas (name, gender, age, personality, speaking_style, 
-                 expertise, greeting, farewell, unknown_response)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+    c.execute("""INSERT INTO personas (name, gender, age, personality, speaking_style,
+                 expertise, greeting, farewell, unknown_response, habits, favorite_emoji,
+                 speaking_speed, message_length)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
               (data["name"], data.get("gender", "未知"), data.get("age", "未知"),
                data.get("personality", ""), data.get("speaking_style", ""),
                data.get("expertise", ""), data.get("greeting", ""),
-               data.get("farewell", ""), data.get("unknown_response", "")))
+               data.get("farewell", ""), data.get("unknown_response", ""),
+               data.get("habits", "[]"), data.get("favorite_emoji", "[]"),
+               data.get("speaking_speed", "normal"), data.get("message_length", "short")))
     conn.commit()
     conn.close()
     return c.lastrowid
@@ -169,8 +172,9 @@ def create_persona(data: dict) -> int:
 def update_persona(id: int, data: dict):
     conn = get_conn()
     c = conn.cursor()
-    fields = ["name", "gender", "age", "personality", "speaking_style", 
-              "expertise", "greeting", "farewell", "unknown_response", "status"]
+    fields = ["name", "gender", "age", "personality", "speaking_style",
+              "expertise", "greeting", "farewell", "unknown_response", "status",
+              "habits", "favorite_emoji", "speaking_speed", "message_length"]
     for field in fields:
         if field in data:
             c.execute(f"UPDATE personas SET {field} = ? WHERE id = ?", (data[field], id))

@@ -109,22 +109,26 @@ class MemorySystem:
     def get_context_for_ai(self, max_memories: int = 10) -> str:
         """生成发送给AI的上下文"""
         context_parts = []
-        
+
         # 添加长期记忆（用户的重要信息）
         if self.long_term:
             important_memories = [m for m in self.long_term if m.importance == "high"]
             normal_memories = [m for m in self.long_term if m.importance != "high"]
-            
+
             context_parts.append("【用户信息】")
             for m in important_memories[:5]:
                 context_parts.append(f"- {m.content}")
-            for m in normal_memories[:max_memories - 5]:
-                context_parts.append(f"- {m.content}")
-        
+
+            # 计算剩余可用记忆槽位
+            remaining = max_memories - len(important_memories)
+            if remaining > 0:
+                for m in normal_memories[:remaining]:
+                    context_parts.append(f"- {m.content}")
+
         # 添加讨论过的话题
         if self.topics_discussed:
             context_parts.append(f"\n【你们聊过的话题】{', '.join(list(self.topics_discussed)[:5])}")
-        
+
         return "\n".join(context_parts) if context_parts else ""
     
     def add_topic(self, topic: str):

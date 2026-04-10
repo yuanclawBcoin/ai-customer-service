@@ -162,8 +162,8 @@ async function loadData() {
     form.greeting = data.greeting || ''
     form.farewell = data.farewell || ''
     form.unknown_response = data.unknown_response || ''
-    form.habits = data.habits || ''
-    form.favorite_emoji = data.favorite_emoji || ''
+    form.habits = parseList(data.habits).join('、')
+    form.favorite_emoji = parseList(data.favorite_emoji).join('、')
     form.speaking_speed = data.speaking_speed || 'normal'
     form.message_length = data.message_length || 'short'
   }
