@@ -53,12 +53,13 @@ class TelegramClient:
     async def send_code(self, phone_number: str) -> dict:
         """发送验证码"""
         try:
+            print(f"[DEBUG] send_code - api_id={self.api_id}, api_hash={self.api_hash[:10] if self.api_hash else 'None'}...")
+            
             # 创建临时客户端
             self.client = Client(
                 self.session_name,
                 api_id=self.api_id,
-                api_hash=self.api_hash,
-                in_memory=True  # 内存模式，不立即创建文件
+                api_hash=self.api_hash
             )
             
             await self.client.connect()
