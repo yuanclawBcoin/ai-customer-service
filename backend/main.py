@@ -150,27 +150,64 @@ async def update_tg_account_data(account_id: int, data: dict):
     update_tg_account(account_id, data)
     return {"success": True}
 
+@app.post("/api/tg-accounts/{account_id}/send-code")
+async def send_tg_code(account_id: int, data: dict):
+    """发送验证码到手机"""
+    from tg_client import TelegramClient, set_client
+    
+    phone = data.get("phone")
+    if not phone:
+        return {"success": False, "error": "请提供手机号"}
+    
+    client = TelegramClient(account_id)
+    result = await client.send_code(phone)
+    
+    if result.get("success"):
+        set_client(account_id, client)
+    
+    return result
+
+@app.post("/api/tg-accounts/{account_id}/verify-code")
+async def verify_tg_code(account_id: int, data: dict):
+    """验证验证码"""
+    from tg_client import get_client, set_client
+    
+    code = data.get("code")
+    if not code:
+        return {"success": False, "error": "请提供验证码"}
+    
+    client = get_client(account_id)
+    if not client:
+        return {"success": False, "error": "请先发送验证码"}
+    
+    result = await client.verify_code(code)
+    
+    if result.get("success"):
+        update_tg_account(account_id, {"status": "online"})
+    
+    return result
+
 @app.post("/api/tg-accounts/{account_id}/connect")
 async def connect_tg_account(account_id: int):
-    """连接 TG 账号"""
-    from backend.tg_client import get_client, TelegramClient
+    """连接 TG 账号（使用已有 session）"""
+    from tg_client import get_client
     
     # 检查是否已连接
     client = get_client(account_id)
     if client:
         return {"success": True, "message": "已连接"}
     
-    # 创建新连接
+    # 尝试启动（有 session 文件时直接启动）
+    from tg_client import TelegramClient
     client = TelegramClient(account_id)
     success = await client.start()
     
     if success:
-        from backend.tg_client import _clients
-        _clients[account_id] = client
+        set_client(account_id, client)
         update_tg_account(account_id, {"status": "online"})
         return {"success": True, "message": "连接成功"}
     else:
-        return {"success": False, "message": "连接失败，请检查 API ID/Hash"}
+        return {"success": False, "need_auth": True, "message": "需要先验证账号"}
 
 @app.post("/api/tg-accounts/{account_id}/disconnect")
 async def disconnect_tg_account(account_id: int):

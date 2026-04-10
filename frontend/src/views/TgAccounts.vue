@@ -40,7 +40,7 @@
               type="success" 
               link 
               size="small" 
-              @click="connect(row)"
+              @click="startAuth(row)"
             >
               连接
             </el-button>
@@ -91,19 +91,57 @@
         <el-button type="primary" @click="saveAccount" :loading="saving">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 验证码对话框 -->
+    <el-dialog v-model="showVerifyDialog" title="验证 Telegram 账号" width="400px" :close-on-click-modal="false">
+      <div v-if="!verifyStep">
+        <p style="margin-bottom: 20px;">请输入手机号（需要与 Telegram 账号绑定）</p>
+        <el-form :model="verifyForm" label-width="80px">
+          <el-form-item label="手机号">
+            <el-input v-model="verifyForm.phone" placeholder="+86138xxxxxxx" />
+          </el-form-item>
+        </el-form>
+      </div>
+      <div v-else>
+        <p style="margin-bottom: 20px;">验证码已发送，请输入收到的验证码</p>
+        <el-form :model="verifyForm" label-width="80px">
+          <el-form-item label="验证码">
+            <el-input v-model="verifyForm.code" placeholder="12345" maxlength="5" />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <el-button @click="showVerifyDialog = false; verifyStep = false">取消</el-button>
+        <el-button v-if="!verifyStep" type="primary" @click="sendCode" :loading="verifying">
+          发送验证码
+        </el-button>
+        <el-button v-else type="primary" @click="submitCode" :loading="verifying">
+          确认
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTgAccounts, createTgAccount, updateTgAccount, connectTgAccount, disconnectTgAccount, getPersonas } from '../api'
+import { ElMessage } from 'element-plus'
+import { getTgAccounts, createTgAccount, updateTgAccount, disconnectTgAccount, getPersonas } from '../api'
 
 const accounts = ref([])
 const personas = ref([])
 const showAddDialog = ref(false)
 const editingAccount = ref(null)
 const saving = ref(false)
+const showVerifyDialog = ref(false)
+const verifyStep = ref(false)
+const verifying = ref(false)
+const currentAuthAccount = ref(null)
+
+const verifyForm = reactive({
+  phone: '',
+  code: ''
+})
 
 const form = reactive({
   name: '',
@@ -181,17 +219,67 @@ async function saveAccount() {
   }
 }
 
-async function connect(account) {
+function startAuth(account) {
+  currentAuthAccount.value = account
+  verifyStep.value = false
+  verifyForm.phone = account.phone || ''
+  verifyForm.code = ''
+  showVerifyDialog.value = true
+}
+
+async function sendCode() {
+  if (!verifyForm.phone) {
+    ElMessage.warning('请输入手机号')
+    return
+  }
+
+  verifying.value = true
   try {
-    const result = await connectTgAccount(account.id)
+    const result = await fetch(`/api/tg-accounts/${currentAuthAccount.value.id}/send-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: verifyForm.phone })
+    }).then(r => r.json())
+
     if (result.success) {
-      ElMessage.success('连接成功')
+      verifyStep.value = true
+      ElMessage.success('验证码已发送')
     } else {
-      ElMessage.error(result.message || '连接失败')
+      ElMessage.error(result.error || '发送失败')
     }
-    loadData()
   } catch (e) {
-    ElMessage.error('连接失败')
+    ElMessage.error('发送验证码失败')
+  } finally {
+    verifying.value = false
+  }
+}
+
+async function submitCode() {
+  if (!verifyForm.code) {
+    ElMessage.warning('请输入验证码')
+    return
+  }
+
+  verifying.value = true
+  try {
+    const result = await fetch(`/api/tg-accounts/${currentAuthAccount.value.id}/verify-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: verifyForm.code })
+    }).then(r => r.json())
+
+    if (result.success) {
+      showVerifyDialog.value = false
+      verifyStep.value = false
+      ElMessage.success('验证成功！')
+      loadData()
+    } else {
+      ElMessage.error(result.error || '验证失败')
+    }
+  } catch (e) {
+    ElMessage.error('验证失败')
+  } finally {
+    verifying.value = false
   }
 }
 
