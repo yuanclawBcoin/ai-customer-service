@@ -20,6 +20,7 @@ class PendingAuth:
     def __init__(self):
         self.phone_code_hash: Optional[str] = None
         self.phone_number: Optional[str] = None
+        self.client: Optional[Client] = None
 
 # 全局认证状态管理
 _pending_auth: Dict[int, PendingAuth] = {}
@@ -67,13 +68,14 @@ class TelegramClient:
             # 发送验证码
             sent_code = await self.client.send_code(phone_number)
             
-            # 保存认证状态
+            # 保存认证状态（包含client实例不断开）
             if self.account_id not in _pending_auth:
                 _pending_auth[self.account_id] = PendingAuth()
             _pending_auth[self.account_id].phone_code_hash = sent_code.phone_code_hash
             _pending_auth[self.account_id].phone_number = phone_number
+            _pending_auth[self.account_id].client = self.client  # 保存client实例
             
-            await self.client.disconnect()
+            # 不要断开！保持连接给verify_code使用
             
             return {"success": True, "need_verify": True, "message": "验证码已发送"}
             
@@ -87,14 +89,11 @@ class TelegramClient:
             if not auth or not auth.phone_code_hash:
                 return {"success": False, "error": "请先发送验证码"}
 
-            # 创建客户端并验证
-            self.client = Client(
-                self.session_name,
-                api_id=self.api_id,
-                api_hash=self.api_hash
-            )
+            # 复用send_code中的client（不断开）
+            self.client = auth.client
 
-            await self.client.connect()
+            if not self.client or not self.client.is_connected:
+                return {"success": False, "error": "会话已断开，请重新发送验证码"}
 
             # 尝试登录
             if password:
@@ -126,6 +125,8 @@ class TelegramClient:
 
             # 清理待验证状态
             if self.account_id in _pending_auth:
+                if _pending_auth[self.account_id].client:
+                    await _pending_auth[self.account_id].client.disconnect()
                 del _pending_auth[self.account_id]
 
             return {"success": True, "message": "登录成功"}
