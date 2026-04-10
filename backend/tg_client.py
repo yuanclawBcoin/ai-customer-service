@@ -96,26 +96,22 @@ class TelegramClient:
                 return {"success": False, "error": "会话已断开，请重新发送验证码"}
 
             # 尝试登录
-            if password:
-                # 有2FA密码的情况
+            try:
                 await self.client.sign_in(
                     phone_number=auth.phone_number,
                     phone_code_hash=auth.phone_code_hash,
-                    phone_code=code,
-                    password=password
+                    phone_code=code
                 )
-            else:
-                try:
-                    await self.client.sign_in(
-                        phone_number=auth.phone_number,
-                        phone_code_hash=auth.phone_code_hash,
-                        phone_code=code
-                    )
-                except Exception as e:
-                    # 检查是否需要2FA密码
-                    error_str = str(e).lower()
-                    if "password" in error_str or "2fa" in error_str or "two-factor" in error_str:
+            except Exception as e:
+                # 检查是否需要2FA密码
+                error_str = str(e).lower()
+                if "password" in error_str or "2fa" in error_str or "two-factor" in error_str:
+                    if password:
+                        # 有2FA密码，调用check_password
+                        await self.client.check_password(password)
+                    else:
                         return {"success": False, "need_2fa": True, "error": "请输入2FA密码"}
+                else:
                     raise
 
             # 保存 session 文件
