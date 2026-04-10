@@ -56,14 +56,16 @@ class TelegramClient:
         try:
             # 标记消息为已读
             try:
-                # 方式1: 直接在message对象上调用mark_read
-                await message.mark_read()
-            except Exception as e1:
-                # 方式2: 尝试read_history
-                try:
-                    await client.read_history(chat_id=message.chat.id, max_id=message.id)
-                except Exception as e2:
-                    print(f"[TG-{self.account_id}] 标记已读失败: mark={e1}, read={e2}")
+                # 使用原始API调用 ReadHistory
+                from pyrogram.raw.functions.messages import ReadHistory
+                await client.invoke(
+                    ReadHistory(
+                        peer=await client.resolve_peer(message.chat.id),
+                        max_id=message.id
+                    )
+                )
+            except Exception as e:
+                print(f"[TG-{self.account_id}] 标记已读失败: {e}")
 
             from backend.main import handle_tg_message
             await handle_tg_message(self.account_id, message)
