@@ -26,6 +26,10 @@
           <el-icon><Collection /></el-icon>
           <span>记忆管理</span>
         </el-menu-item>
+        <el-menu-item index="/conversations">
+          <el-icon><ChatDotRound /></el-icon>
+          <span>对话记录</span>
+        </el-menu-item>
         <el-menu-item index="/settings">
           <el-icon><Setting /></el-icon>
           <span>系统设置</span>
@@ -65,6 +69,7 @@ const pageTitle = computed(() => {
     '/personas/create': '创建人设',
     '/tg-accounts': 'Telegram 账号',
     '/memories': '记忆管理',
+    '/conversations': '对话记录',
     '/settings': '系统设置'
   }
   return titles[route.path] || 'AI 客服'

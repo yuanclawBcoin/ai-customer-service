@@ -195,12 +195,28 @@ def update_persona(id: int, data: dict):
 def get_conversation(user_id: str, platform: str = "telegram") -> Optional[dict]:
     conn = get_conn()
     c = conn.cursor()
-    c.execute("""SELECT * FROM conversations WHERE user_id = ? AND platform = ? 
+    c.execute("""SELECT * FROM conversations WHERE user_id = ? AND platform = ?
                  AND status = 'active' ORDER BY updated_at DESC LIMIT 1""",
               (user_id, platform))
     row = c.fetchone()
     conn.close()
     return dict(row) if row else None
+
+def get_all_conversations(user_id: str = None, platform: str = "telegram", limit: int = 50) -> List[dict]:
+    """获取用户的所有对话记录"""
+    conn = get_conn()
+    c = conn.cursor()
+    if user_id:
+        c.execute("""SELECT * FROM conversations WHERE user_id = ? AND platform = ?
+                     ORDER BY updated_at DESC LIMIT ?""",
+                  (user_id, platform, limit))
+    else:
+        c.execute("""SELECT * FROM conversations WHERE platform = ?
+                     ORDER BY updated_at DESC LIMIT ?""",
+                  (platform, limit))
+    rows = c.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
 
 def save_conversation(user_id: str, platform: str, messages: list, persona_id: int = None):
     import json

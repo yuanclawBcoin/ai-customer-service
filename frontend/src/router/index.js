@@ -45,6 +45,11 @@ const routes = [
         component: () => import('../views/Memories.vue')
       },
       {
+        path: 'conversations',
+        name: 'Conversations',
+        component: () => import('../views/Conversations.vue')
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('../views/Settings.vue')

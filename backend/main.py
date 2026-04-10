@@ -225,9 +225,15 @@ async def disconnect_tg_account(account_id: int):
 # --- 对话记录 API ---
 
 @app.get("/api/conversations")
-async def list_conversations(user_id: str = None, platform: str = "telegram"):
+async def list_conversations(user_id: str = None, platform: str = "telegram", all: bool = False):
     """获取对话记录"""
-    from backend.models.database import get_conversation
+    from backend.models.database import get_conversation, get_all_conversations
+
+    # 如果需要所有对话记录
+    if all:
+        return get_all_conversations(user_id, platform)
+
+    # 否则返回单个用户的最新对话
     if user_id:
         conv = get_conversation(user_id, platform)
         return conv if conv else {"messages": []}

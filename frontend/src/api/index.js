@@ -41,6 +41,7 @@ export const addMemory = (data) => api.post('/memories', data)
 
 // 对话相关
 export const getConversations = (userId, platform) => api.get('/conversations', { params: { user_id: userId, platform } })
+export const getAllConversations = (userId) => api.get('/conversations', { params: { user_id: userId, all: true } })
 
 // 情绪相关
 export const getEmotion = (userId, personaId) => api.get('/emotions', { params: { user_id: userId, persona_id: personaId } })
