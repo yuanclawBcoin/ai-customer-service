@@ -252,7 +252,7 @@ async function sendCode() {
     }).then(r => r.json())
 
     if (result.success) {
-      verifyStep.value = true
+      verifyStep.value = 'code'  // 切换到输入验证码步骤
       ElMessage.success('验证码已发送')
     } else {
       ElMessage.error(result.error || '发送失败')
