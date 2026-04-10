@@ -362,6 +362,10 @@ async def handle_tg_message(account_id: int, message):
         )
         
         if response:
+            # 模拟真人打字延迟（0.5-3秒）
+            typing_delay = emotion_engine.get_typing_delay()
+            await asyncio.sleep(typing_delay)
+            
             # 发送回复
             await message.reply(response)
             
