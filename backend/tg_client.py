@@ -114,8 +114,7 @@ class TelegramClient:
                 else:
                     raise
 
-            # 保存 session 文件
-            self.client.save_session()
+            # session 会在 disconnect 时自动保存
             self._connected = True
             self.running = True
 
