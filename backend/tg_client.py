@@ -9,12 +9,16 @@ from typing import Optional, Callable
 from pyrogram import Client, filters
 from pyrogram.types import Message
 
-from backend.config import settings
-from backend.models.database import get_config, get_persona, get_emotion, update_emotion
-from backend.ai_engine.emotion import EmotionEngine
-from backend.ai_engine.memory import MemorySystem
-from backend.ai_engine.persona import Persona
-from backend.ai_engine.generator import get_generator, update_generator
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import settings
+from models.database import get_config, get_persona, get_emotion, update_emotion
+from ai_engine.emotion import EmotionEngine
+from ai_engine.memory import MemorySystem
+from ai_engine.persona import Persona
+from ai_engine.generator import get_generator, update_generator
 
 class TelegramClient:
     """Telegram 个人号客户端"""

@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from typing import List, Optional
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "ai客服.db")
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "ai客服.db")
 
 def get_conn():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)

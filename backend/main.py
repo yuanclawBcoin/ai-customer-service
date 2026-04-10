@@ -10,10 +10,14 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from backend.config import settings
-from backend.models.database import init_db, get_config, set_config, get_personas, get_persona, create_persona, update_persona
-from backend.models.database import get_tg_accounts, add_tg_account, update_tg_account
-from backend.tg_client import start_all_clients, stop_all_clients
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from config import settings
+from models.database import init_db, get_config, set_config, get_personas, get_persona, create_persona, update_persona
+from models.database import get_tg_accounts, add_tg_account, update_tg_account
+from tg_client import start_all_clients, stop_all_clients
 
 # 初始化数据库
 init_db()

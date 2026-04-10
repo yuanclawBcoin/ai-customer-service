@@ -4,7 +4,11 @@
 import json
 import httpx
 from typing import List, Dict, Optional
-from backend.config import settings
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from config import settings
 
 class ReplyGenerator:
     """AI 回复生成器"""
