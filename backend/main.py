@@ -274,129 +274,151 @@ async def handle_tg_message(account_id: int, message):
         from ai_engine.generator import get_generator
         from ai_engine.emotion import EmotionEngine
         from ai_engine.memory import MemorySystem, MemoryExtractor
-        
+
         # 获取账号配置
         accounts = get_tg_accounts()
         account = next((a for a in accounts if a["id"] == account_id), None)
         if not account:
             print(f"[TG-{account_id}] 账号未找到")
             return
-        
+
         # 检查是否开启自动回复
         if not account.get("auto_reply"):
             print(f"[TG-{account_id}] 自动回复已关闭")
             return
-        
+
         # 获取人设
         persona_id = account.get("persona_id")
         if not persona_id:
             print(f"[TG-{account_id}] 未绑定人设")
             return
-        
+
         persona = get_persona(persona_id)
         if not persona:
             print(f"[TG-{account_id}] 人设未找到: {persona_id}")
             return
-        
+
         # 获取用户信息
         user_id = str(message.from_user.id)
         user_message = message.text or ""
-        
+
         # 初始化情绪引擎和记忆系统（每个用户独立）
         if not hasattr(handle_tg_message, 'user_emotions'):
             handle_tg_message.user_emotions = {}
         if not hasattr(handle_tg_message, 'user_memories'):
             handle_tg_message.user_memories = {}
-        
+        if not hasattr(handle_tg_message, 'user_topics'):
+            handle_tg_message.user_topics = {}  # 追踪用户讨论过的话题
+
         if user_id not in handle_tg_message.user_emotions:
             handle_tg_message.user_emotions[user_id] = EmotionEngine()
         if user_id not in handle_tg_message.user_memories:
-            handle_tg_message.user_memories[user_id] = MemorySystem()
-        
+            memory_system = MemorySystem()
+
+            # 从数据库加载该用户的历史记忆
+            from models.database import get_memories
+            db_memories = get_memories(user_id, account_id)
+            for mem in db_memories:
+                from ai_engine.memory import Memory
+                memory_system.add_long_term(Memory(
+                    content=mem["content"],
+                    importance=mem.get("importance", "normal"),
+                    category=mem.get("category", "general")
+                ))
+
+            handle_tg_message.user_memories[user_id] = memory_system
+
         emotion_engine = handle_tg_message.user_emotions[user_id]
         memory_system = handle_tg_message.user_memories[user_id]
-        
+
         # 分析用户情绪（双向互动）
         user_emotion = emotion_engine.analyze_text(user_message)
         emotion_engine.update(user_message)
-        
+
         # 获取AI的情绪状态
         ai_emotion = emotion_engine.get_ai_emotion()
-        
+
         # 检查是否应该忽略（模拟真人偶尔不回复）
         if emotion_engine.should_ignore():
-            print(f"[TG-{account_id}] 情绪激动，暂时不回复用户 {user_id}")
+            print(f"[TG-{account_id}] 看心情，暂时不回复用户 {user_id}")
             return
-        
+
         # 判断是否是第一条消息
         is_first_message = len(memory_system.short_term) == 0
-        
+
         # 添加用户消息到记忆
         memory_system.add_short_term("user", user_message, persona_id)
-        
+
         # 构建消息列表（包含对话历史）
         messages = []
         for msg in memory_system.short_term[-10:]:
             messages.append({"role": msg["role"], "content": msg["content"]})
-        
+
         # 构建系统提示词
         from ai_engine.persona import Persona
         persona_obj = Persona(persona)
-        
+
         # 获取人设的个性化设置
         persona_habits = persona_obj.get_habits()
-        
+
         # 只有第一条消息才加开场白
         emotion_style = emotion_engine.get_style_modifier()
         system_prompt = persona_obj.get_system_prompt(emotion_style, ai_emotion=ai_emotion)
-        
+
         if is_first_message:
             system_prompt += f"\n\n【开场白】{persona_obj.get_greeting()}"
-        
+
         # 加入记忆上下文
         context = memory_system.get_context_for_ai()
         if context:
             system_prompt += f"\n\n{context}"
-        
+
+        # 加入情绪上下文
+        emotion_context = emotion_engine.get_context_for_ai()
+        if emotion_context:
+            system_prompt += f"\n\n【当前对话情绪】{emotion_context}"
+
         # 调用 AI 生成回复
         generator = get_generator()
         response = await generator.generate(
             system_prompt=system_prompt,
             messages=messages,
-            context=context,
-            persona_habits=persona_habits  # 传入人设习惯
+            persona_habits=persona_habits
         )
-        
+
         if response:
-            # 模拟真人打字延迟（0.5-3秒）
+            # 模拟真人打字延迟
             typing_delay = emotion_engine.get_typing_delay()
             await asyncio.sleep(typing_delay)
-            
-            # 模拟真人偶尔打错字（5%概率）
+
+            # 模拟真人偶尔打错字
             response = emotion_engine.simulate_typo(response)
-            
+
             # 发送回复
             await message.reply(response)
-            
+
             # 添加AI回复到记忆
             memory_system.add_short_term("assistant", response, persona_id)
-            
+
             # 用AI提取重要信息并存入数据库
             conversation = f"用户: {user_message}\n助手: {response}"
             extracted_memories = await MemoryExtractor.extract(conversation, generator)
             for mem in extracted_memories:
                 save_user_memory(user_id, account_id, mem)
                 memory_system.add_long_term(mem)
-            
+
             # 提取讨论话题
             topic_extracted = await extract_topic(user_message, generator)
             if topic_extracted:
                 memory_system.add_topic(topic_extracted)
-            
+                if user_id not in handle_tg_message.user_topics:
+                    handle_tg_message.user_topics[user_id] = {}
+                handle_tg_message.user_topics[user_id][topic_extracted] = True
+
             print(f"[TG-{account_id}] [{ai_emotion}] 已回复用户 {user_id}: {response[:30]}...")
         else:
             print(f"[TG-{account_id}] AI 未生成回复")
-            
+
     except Exception as e:
         print(f"[TG-{account_id}] 处理消息异常: {e}")
         import traceback
@@ -406,13 +428,13 @@ async def handle_tg_message(account_id: int, message):
 async def extract_topic(text: str, generator) -> str:
     """从消息中提取讨论话题"""
     try:
-        prompt = f"从下面文本中提取一个讨论话题关键词（如：股票、电影、美食、游戏等），只返回一个词，没有就返回空：\n{text}"
+        prompt = f"从下面文本中提取一个讨论话题关键词（如：股票、电影、美食、游戏、旅行等），只返回一个词，没有就返回空：\n{text}"
         result = await generator.generate(
             system_prompt="你是一个话题提取器。",
             messages=[{"role": "user", "content": prompt}]
         )
         result = result.strip()
-        if result and len(result) <= 10:
+        if result and len(result) <= 10 and not result.startswith("没有"):
             return result
     except:
         pass

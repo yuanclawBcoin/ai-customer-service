@@ -33,9 +33,31 @@ def init_db():
         greeting TEXT DEFAULT '',
         farewell TEXT DEFAULT '',
         unknown_response TEXT DEFAULT '',
+        habits TEXT DEFAULT '[]',
+        favorite_emoji TEXT DEFAULT '[]',
+        speaking_speed TEXT DEFAULT 'normal',
+        message_length TEXT DEFAULT 'short',
         status TEXT DEFAULT 'active',
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )""")
+
+    # 添加新字段（如果不存在）
+    try:
+        c.execute("ALTER TABLE personas ADD COLUMN habits TEXT DEFAULT '[]'")
+    except:
+        pass
+    try:
+        c.execute("ALTER TABLE personas ADD COLUMN favorite_emoji TEXT DEFAULT '[]'")
+    except:
+        pass
+    try:
+        c.execute("ALTER TABLE personas ADD COLUMN speaking_speed TEXT DEFAULT 'normal'")
+    except:
+        pass
+    try:
+        c.execute("ALTER TABLE personas ADD COLUMN message_length TEXT DEFAULT 'short'")
+    except:
+        pass
     
     # 对话记录表
     c.execute("""CREATE TABLE IF NOT EXISTS conversations (

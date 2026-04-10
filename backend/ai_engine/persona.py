@@ -60,7 +60,21 @@ class Persona:
         """生成系统提示词"""
         personality_text = ", ".join(self.personality) if isinstance(self.personality, list) else self.personality
         style_text = ", ".join(self.speaking_style) if isinstance(self.speaking_style, list) else self.speaking_style
-        
+
+        # 消息长度指导
+        length_guide = {
+            "very_short": "消息要非常短，最多1句话",
+            "short": "消息要短，1-2句话",
+            "normal": "消息长度适中，2-3句话"
+        }.get(getattr(self, 'message_length', 'short'), "消息要短，1-2句话")
+
+        # 说话节奏指导
+        speed_guide = {
+            "fast": "打字很快，回复也快",
+            "normal": "正常速度",
+            "slow": "打字慢悠悠的，不着急回复"
+        }.get(getattr(self, 'speaking_speed', 'normal'), "正常速度")
+
         prompt = f"""你和用户是朋友关系，在微信上聊天。
 
 【你是什么样的人】
@@ -70,7 +84,8 @@ class Persona:
 【你怎么说话】
 - {style_text}
 - 像朋友发消息一样随意
-- 消息很短，1-2句话最多
+- {length_guide}
+- {speed_guide}
 - 可以用口头禅增加个性"""
 
         # 添加口头禅

@@ -74,6 +74,34 @@
                     placeholder="遇到无法回答的问题时的回复" />
         </el-form-item>
 
+        <el-divider content-position="left">个性化设置（让人设更独特）</el-divider>
+
+        <el-form-item label="口头禅">
+          <el-input v-model="form.habits" placeholder="如：哈哈哈、嘛、嗯嗯、卧槽（用顿号分隔）" />
+          <div class="form-tip">设置AI常用的口头禅，让回复更有特色</div>
+        </el-form-item>
+
+        <el-form-item label="常用emoji">
+          <el-input v-model="form.favorite_emoji" placeholder="如：😂、😏、😭（用顿号分隔）" />
+          <div class="form-tip">AI会偶尔使用这些emoji</div>
+        </el-form-item>
+
+        <el-form-item label="说话节奏">
+          <el-select v-model="form.speaking_speed" placeholder="选择说话节奏" style="width: 100%">
+            <el-option label="快速" value="fast" />
+            <el-option label="正常" value="normal" />
+            <el-option label="慢悠悠" value="slow" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="消息长度">
+          <el-select v-model="form.message_length" placeholder="选择消息长度" style="width: 100%">
+            <el-option label="很短（1句话）" value="very_short" />
+            <el-option label="短（1-2句）" value="short" />
+            <el-option label="正常（2-3句）" value="normal" />
+          </el-select>
+        </el-form-item>
+
         <el-form-item>
           <el-button type="primary" @click="save" :loading="saving">
             {{ isEdit ? '保存修改' : '创建人设' }}
@@ -107,7 +135,11 @@ const form = reactive({
   personality_desc: '',
   greeting: '',
   farewell: '',
-  unknown_response: ''
+  unknown_response: '',
+  habits: '',
+  favorite_emoji: '',
+  speaking_speed: 'normal',
+  message_length: 'short'
 })
 
 const personalityOptions = ref([])
@@ -130,6 +162,10 @@ async function loadData() {
     form.greeting = data.greeting || ''
     form.farewell = data.farewell || ''
     form.unknown_response = data.unknown_response || ''
+    form.habits = data.habits || ''
+    form.favorite_emoji = data.favorite_emoji || ''
+    form.speaking_speed = data.speaking_speed || 'normal'
+    form.message_length = data.message_length || 'short'
   }
 }
 
@@ -153,10 +189,25 @@ async function save() {
 
   saving.value = true
   try {
+    // 处理口头禅和emoji，转换为数组
+    const habitsArray = form.habits ? form.habits.split('、').map(s => s.trim()).filter(Boolean) : []
+    const emojiArray = form.favorite_emoji ? form.favorite_emoji.split('、').map(s => s.trim()).filter(Boolean) : []
+
     const data = {
-      ...form,
+      name: form.name,
+      gender: form.gender,
+      age: form.age,
+      expertise: form.expertise,
       personality: JSON.stringify(form.personality),
-      speaking_style: JSON.stringify(form.speaking_style)
+      speaking_style: JSON.stringify(form.speaking_style),
+      personality_desc: form.personality_desc,
+      greeting: form.greeting,
+      farewell: form.farewell,
+      unknown_response: form.unknown_response,
+      habits: JSON.stringify(habitsArray),
+      favorite_emoji: JSON.stringify(emojiArray),
+      speaking_speed: form.speaking_speed,
+      message_length: form.message_length
     }
 
     if (isEdit.value) {
@@ -183,5 +234,10 @@ onMounted(() => {
 <style scoped>
 .persona-form {
   max-width: 800px;
+}
+.form-tip {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
 }
 </style>
