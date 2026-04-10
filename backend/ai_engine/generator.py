@@ -92,8 +92,10 @@ _generator: Optional[ReplyGenerator] = None
 
 def get_generator() -> ReplyGenerator:
     global _generator
-    if _generator is None:
-        _generator = ReplyGenerator()
+    # 每次都从数据库读取最新的 API Key
+    from models.database import get_config
+    api_key = get_config("minimax_api_key", "")
+    _generator = ReplyGenerator(api_key)
     return _generator
 
 def update_generator(api_key: str):
