@@ -55,11 +55,18 @@ def init_db():
         user_id TEXT NOT NULL,
         persona_id INTEGER,
         content TEXT NOT NULL,
+        category TEXT DEFAULT 'general',
         importance TEXT DEFAULT 'normal',
         is_pinned INTEGER DEFAULT 0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         expires_at TEXT
     )""")
+    
+    # 添加category列（如果不存在）
+    try:
+        c.execute("ALTER TABLE memories ADD COLUMN category TEXT DEFAULT 'general'")
+    except:
+        pass
     
     # 情绪状态表
     c.execute("""CREATE TABLE IF NOT EXISTS emotions (
@@ -195,13 +202,34 @@ def get_memories(user_id: str, persona_id: int = None) -> List[dict]:
     conn.close()
     return rows
 
-def add_memory(user_id: str, content: str, persona_id: int = None, 
+def add_memory(user_id: str, content: str, persona_id: int = None,
               importance: str = "normal", is_pinned: bool = False):
     conn = get_conn()
     c = conn.cursor()
     c.execute("""INSERT INTO memories (user_id, persona_id, content, importance, is_pinned)
                  VALUES (?, ?, ?, ?, ?)""", (user_id, persona_id, content, importance, 1 if is_pinned else 0))
     conn.commit()
+    conn.close()
+
+def save_user_memory(user_id: str, account_id: int, memory):
+    """保存从AI提取的用户记忆"""
+    conn = get_conn()
+    c = conn.cursor()
+    
+    # 检查是否已存在相似记忆
+    content = memory.content if hasattr(memory, 'content') else str(memory)
+    category = getattr(memory, 'category', 'general')
+    importance = getattr(memory, 'importance', 'normal')
+    
+    c.execute("SELECT id FROM memories WHERE user_id = ? AND content = ?", (user_id, content))
+    existing = c.fetchone()
+    
+    if not existing:
+        c.execute("""INSERT INTO memories (user_id, persona_id, content, category, importance)
+                     VALUES (?, ?, ?, ?, ?)""",
+                  (user_id, account_id, content, category, importance))
+        conn.commit()
+    
     conn.close()
 
 # 情绪相关

@@ -11,12 +11,17 @@ class Persona:
         "name": "小智",
         "gender": "未知",
         "age": "保密",
-        "personality": "友好、善良、活泼、话多",
-        "speaking_style": "像朋友聊天、随意、口语化、偶尔撒娇",
+        "personality": ["友好", "善良", "活泼", "话多"],
+        "speaking_style": ["像朋友聊天", "随意", "口语化", "偶尔撒娇"],
         "expertise": "日常聊天",
         "greeting": "嗨~",
         "farewell": "拜拜~",
-        "unknown_response": "啊这...我也不知道诶"
+        "unknown_response": "啊这...我也不知道诶",
+        # 个性化设置
+        "habits": [],      # 口头禅，如 ["哈哈哈", "嘛", "嗯嗯"]
+        "favorite_emoji": [],  # 常用的emoji，如 ["😊", "😏", "😂"]
+        "speaking_speed": "normal",  # fast, normal, slow
+        "message_length": "short",  # very_short, short, normal
     }
     
     def __init__(self, data: Optional[Dict] = None):
@@ -37,8 +42,21 @@ class Persona:
                 self.speaking_style = json.loads(self.speaking_style)
             except:
                 self.speaking_style = [p.strip() for p in self.speaking_style.split(",")]
+        
+        # 解析个性化设置
+        if isinstance(self.habits, str):
+            try:
+                self.habits = json.loads(self.habits)
+            except:
+                self.habits = [h.strip() for h in self.habits.split(",") if h.strip()]
+        
+        if isinstance(self.favorite_emoji, str):
+            try:
+                self.favorite_emoji = json.loads(self.favorite_emoji)
+            except:
+                self.favorite_emoji = [e.strip() for e in self.favorite_emoji.split(",") if e.strip()]
     
-    def get_system_prompt(self, emotion_style: str = "") -> str:
+    def get_system_prompt(self, emotion_style: str = "", ai_emotion: str = "") -> str:
         """生成系统提示词"""
         personality_text = ", ".join(self.personality) if isinstance(self.personality, list) else self.personality
         style_text = ", ".join(self.speaking_style) if isinstance(self.speaking_style, list) else self.speaking_style
@@ -47,13 +65,33 @@ class Persona:
 
 【你是什么样的人】
 - 名字：{self.name}
-{personality_text}
+- {personality_text}
 
 【你怎么说话】
 - {style_text}
 - 像朋友发消息一样随意
 - 消息很短，1-2句话最多
+- 可以用口头禅增加个性"""
 
+        # 添加口头禅
+        if self.habits:
+            habits_text = "、".join(self.habits)
+            prompt += f"\n- 你的口头禅：{habits_text}"
+
+        # AI情绪影响
+        if ai_emotion:
+            ai_emotion_hints = {
+                "happy": "你现在心情很好，可以更放开一点",
+                "calm": "你现在比较平静，正常聊天",
+                "playful": "你现在有点调皮，可以开玩笑",
+                "shy": "你现在有点害羞，说话谨慎一点",
+                "cold": "你现在比较冷淡，别太热情",
+                "annoyed": "你有点烦躁，注意态度"
+            }
+            if ai_emotion in ai_emotion_hints:
+                prompt += f"\n- {ai_emotion_hints[ai_emotion]}"
+
+        prompt += f"""
 {emotion_style}
 
 【禁止的事情】
@@ -83,6 +121,15 @@ class Persona:
     def get_unknown_response(self) -> str:
         """获取未知问题回复"""
         return self.unknown_response or self.DEFAULT_PERSONA["unknown_response"]
+    
+    def get_habits(self) -> Dict:
+        """获取人设习惯设置"""
+        return {
+            "habits": self.habits or [],
+            "favorite_emoji": self.favorite_emoji or [],
+            "speaking_speed": getattr(self, 'speaking_speed', 'normal'),
+            "message_length": getattr(self, 'message_length', 'short')
+        }
     
     @staticmethod
     def get_available_personalities() -> list:

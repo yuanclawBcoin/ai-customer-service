@@ -24,20 +24,28 @@ class ReplyGenerator:
         messages: List[Dict],
         context: str = "",
         temperature: float = 0.8,
-        max_tokens: int = 500
+        max_tokens: int = 500,
+        persona_habits: Dict = None
     ) -> str:
         """生成回复"""
-        
+
         if not self.api_key:
             return "【未配置 API Key，请在管理后台设置 MiniMax API Key】"
-        
+
         # 构建消息
         full_messages = []
-        
+
         # 系统提示词
         system_content = system_prompt
         if context:
             system_content += f"\n\n【已知信息】\n{context}"
+
+        # 加入人设习惯
+        if persona_habits:
+            habits = persona_habits.get("habits", [])
+            if habits:
+                habits_text = "、".join(habits)
+                system_content += f"\n\n【你的说话习惯】可以适当使用这些口头禅：{habits_text}"
         
         full_messages.append({
             "role": "system",
