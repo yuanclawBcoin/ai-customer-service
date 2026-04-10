@@ -497,47 +497,71 @@ async def extract_topic(text: str, generator) -> str:
     return ""
 
 
-def split_message(text: str, max_length: int = 200) -> list:
-    """将长消息拆分成短消息（模拟真人打字习惯）"""
-    if not text or len(text) <= max_length:
-        return [text] if text else []
+def split_message(text: str, max_length: int = 80) -> list:
+    """将长消息拆分成短消息（模拟真人打字习惯，真人一般一次发10-30个字）"""
+    if not text:
+        return []
 
-    # 按句子拆分
     import re
-    sentences = re.split(r'([。！？.!?]+)', text)
-    chunks = []
-    current_chunk = ""
 
-    for i, part in enumerate(sentences):
-        if not part.strip():
+    # 清理空白
+    text = text.strip()
+    if not text:
+        return []
+
+    # 如果消息很短，直接返回
+    if len(text) <= 30:
+        return [text]
+
+    # 按标点和空格拆分，保留分隔符
+    # 分割点：。！？，、\n 和 空格
+    parts = re.split(r'([。！？，、\n\s]+)', text)
+
+    chunks = []
+    current = ""
+
+    for part in parts:
+        if not part:
             continue
 
-        # 如果当前片段加上这个句子超过长度限制，先保存当前chunk
-        if len(current_chunk) + len(part) > max_length and current_chunk:
-            chunks.append(current_chunk.strip())
-            current_chunk = ""
-
-        current_chunk += part
-
-        # 如果遇到句末标点，且当前chunk有内容，保存
-        if i % 2 == 1 and current_chunk.strip():
-            # 句子结束，检查是否需要保存
-            if len(current_chunk) > max_length * 0.8:
-                chunks.append(current_chunk.strip())
-                current_chunk = ""
-
-    # 保存剩余的chunk
-    if current_chunk.strip():
-        chunks.append(current_chunk.strip())
-
-    # 如果拆分后超过3条，进一步合并
-    while len(chunks) > 3 and max_length < 400:
-        # 合并最后两条
-        if len(chunks) >= 2:
-            chunks[-2] = chunks[-2] + chunks[-1]
-            chunks.pop()
+        # 如果遇到分隔符（句末标点）
+        if re.match(r'[。！？.!?]+$', part):
+            current += part
+            if len(current) >= 15:  # 至少15个字才发
+                chunks.append(current.strip())
+                current = ""
+        elif len(part) == 1 and re.match(r'[,，]$', part):
+            # 逗号不停，加入current
+            current += part
         else:
-            break
+            # 普通文字片段
+            if len(current) + len(part) > max_length:
+                if current.strip():
+                    chunks.append(current.strip())
+                current = part
+            else:
+                current += part
+
+    # 保存剩余
+    if current.strip():
+        chunks.append(current.strip())
+
+    # 如果只有一条且很长，进一步按字符数拆分
+    if len(chunks) == 1 and len(chunks[0]) > 80:
+        big_text = chunks[0]
+        chunks = []
+        # 按50字左右拆分
+        while len(big_text) > 50:
+            # 找到最后一个逗号或空格
+            split_pos = big_text.rfind('，', 0, 50)
+            if split_pos == -1:
+                split_pos = big_text.rfind(' ', 0, 50)
+            if split_pos == -1:
+                split_pos = 50
+            chunks.append(big_text[:split_pos + 1])
+            big_text = big_text[split_pos + 1:]
+        if big_text.strip():
+            chunks.append(big_text.strip())
 
     return chunks if chunks else [text]
 

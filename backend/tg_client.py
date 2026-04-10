@@ -54,6 +54,12 @@ class TelegramClient:
     async def _handle_message(self, client, message):
         """处理收到的消息"""
         try:
+            # 标记消息为已读
+            try:
+                await message.mark_read()
+            except:
+                pass
+
             from backend.main import handle_tg_message
             await handle_tg_message(self.account_id, message)
         except Exception as e:
