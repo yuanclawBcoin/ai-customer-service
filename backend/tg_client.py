@@ -79,40 +79,56 @@ class TelegramClient:
         except Exception as e:
             return {"success": False, "error": str(e)}
     
-    async def verify_code(self, code: str) -> dict:
-        """验证验证码"""
+    async def verify_code(self, code: str, password: str = None) -> dict:
+        """验证验证码（可能需要2FA密码）"""
         try:
             auth = _pending_auth.get(self.account_id)
             if not auth or not auth.phone_code_hash:
                 return {"success": False, "error": "请先发送验证码"}
-            
+
             # 创建客户端并验证
             self.client = Client(
                 self.session_name,
                 api_id=self.api_id,
                 api_hash=self.api_hash
             )
-            
+
             await self.client.connect()
-            
+
             # 尝试登录
-            await self.client.sign_in(
-                phone_number=auth.phone_number,
-                phone_code_hash=auth.phone_code_hash,
-                phone_code=code
-            )
-            
+            if password:
+                # 有2FA密码的情况
+                await self.client.sign_in(
+                    phone_number=auth.phone_number,
+                    phone_code_hash=auth.phone_code_hash,
+                    phone_code=code,
+                    password=password
+                )
+            else:
+                try:
+                    await self.client.sign_in(
+                        phone_number=auth.phone_number,
+                        phone_code_hash=auth.phone_code_hash,
+                        phone_code=code
+                    )
+                except Exception as e:
+                    # 检查是否需要2FA密码
+                    error_str = str(e).lower()
+                    if "password" in error_str or "2fa" in error_str or "two-factor" in error_str:
+                        return {"success": False, "need_2fa": True, "error": "请输入2FA密码"}
+                    raise
+
             # 保存 session 文件
             self.client.save_session()
             self._connected = True
             self.running = True
-            
+
             # 清理待验证状态
             if self.account_id in _pending_auth:
                 del _pending_auth[self.account_id]
-            
+
             return {"success": True, "message": "登录成功"}
-            
+
         except Exception as e:
             return {"success": False, "error": str(e)}
     

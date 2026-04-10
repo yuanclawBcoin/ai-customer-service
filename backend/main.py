@@ -173,6 +173,7 @@ async def verify_tg_code(account_id: int, data: dict):
     from tg_client import get_client, set_client
     
     code = data.get("code")
+    password = data.get("password")  # 2FA密码（可选）
     if not code:
         return {"success": False, "error": "请提供验证码"}
     
@@ -180,7 +181,7 @@ async def verify_tg_code(account_id: int, data: dict):
     if not client:
         return {"success": False, "error": "请先发送验证码"}
     
-    result = await client.verify_code(code)
+    result = await client.verify_code(code, password)
     
     if result.get("success"):
         update_tg_account(account_id, {"status": "online"})

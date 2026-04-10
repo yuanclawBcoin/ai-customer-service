@@ -94,7 +94,7 @@
 
     <!-- 验证码对话框 -->
     <el-dialog v-model="showVerifyDialog" title="验证 Telegram 账号" width="400px" :close-on-click-modal="false">
-      <div v-if="!verifyStep">
+      <div v-if="verifyStep === 'phone'">
         <p style="margin-bottom: 20px;">请输入手机号（需要与 Telegram 账号绑定）</p>
         <el-form :model="verifyForm" label-width="80px">
           <el-form-item label="手机号">
@@ -102,7 +102,7 @@
           </el-form-item>
         </el-form>
       </div>
-      <div v-else>
+      <div v-else-if="verifyStep === 'code'">
         <p style="margin-bottom: 20px;">验证码已发送，请输入收到的验证码</p>
         <el-form :model="verifyForm" label-width="80px">
           <el-form-item label="验证码">
@@ -110,9 +110,17 @@
           </el-form-item>
         </el-form>
       </div>
+      <div v-else-if="verifyStep === '2fa'">
+        <p style="margin-bottom: 20px;">您的账号开启了两步验证，请输入密码</p>
+        <el-form :model="verifyForm" label-width="80px">
+          <el-form-item label="2FA 密码">
+            <el-input v-model="verifyForm.password" type="password" placeholder="输入密码" show-password />
+          </el-form-item>
+        </el-form>
+      </div>
       <template #footer>
-        <el-button @click="showVerifyDialog = false; verifyStep = false">取消</el-button>
-        <el-button v-if="!verifyStep" type="primary" @click="sendCode" :loading="verifying">
+        <el-button @click="showVerifyDialog = false; verifyStep = 'phone'">取消</el-button>
+        <el-button v-if="verifyStep === 'phone'" type="primary" @click="sendCode" :loading="verifying">
           发送验证码
         </el-button>
         <el-button v-else type="primary" @click="submitCode" :loading="verifying">
@@ -140,7 +148,8 @@ const currentAuthAccount = ref(null)
 
 const verifyForm = reactive({
   phone: '',
-  code: ''
+  code: '',
+  password: ''
 })
 
 const form = reactive({
@@ -221,9 +230,10 @@ async function saveAccount() {
 
 function startAuth(account) {
   currentAuthAccount.value = account
-  verifyStep.value = false
+  verifyStep.value = 'phone'
   verifyForm.phone = account.phone || ''
   verifyForm.code = ''
+  verifyForm.password = ''
   showVerifyDialog.value = true
 }
 
@@ -255,8 +265,12 @@ async function sendCode() {
 }
 
 async function submitCode() {
-  if (!verifyForm.code) {
+  if (verifyStep.value === 'code' && !verifyForm.code) {
     ElMessage.warning('请输入验证码')
+    return
+  }
+  if (verifyStep.value === '2fa' && !verifyForm.password) {
+    ElMessage.warning('请输入2FA密码')
     return
   }
 
@@ -265,14 +279,22 @@ async function submitCode() {
     const result = await fetch(`/api/tg-accounts/${currentAuthAccount.value.id}/verify-code`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: verifyForm.code })
+      body: JSON.stringify({
+        code: verifyForm.code,
+        password: verifyForm.password || undefined
+      })
     }).then(r => r.json())
 
     if (result.success) {
       showVerifyDialog.value = false
-      verifyStep.value = false
+      verifyStep.value = 'phone'
       ElMessage.success('验证成功！')
       loadData()
+    } else if (result.need_2fa) {
+      // 需要2FA密码
+      verifyStep.value = '2fa'
+      verifyForm.password = ''
+      ElMessage.info('请输入2FA密码')
     } else {
       ElMessage.error(result.error || '验证失败')
     }
