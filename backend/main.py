@@ -302,22 +302,28 @@ async def handle_tg_message(account_id: int, message):
         user_id = str(message.from_user.id)
         user_message = message.text or ""
 
-        # 初始化情绪引擎和记忆系统（每个用户独立）
+        # 初始化情绪引擎、记忆系统和话题（每个用户独立）
         if not hasattr(handle_tg_message, 'user_emotions'):
             handle_tg_message.user_emotions = {}
         if not hasattr(handle_tg_message, 'user_memories'):
             handle_tg_message.user_memories = {}
         if not hasattr(handle_tg_message, 'user_topics'):
-            handle_tg_message.user_topics = {}  # 追踪用户讨论过的话题
+            handle_tg_message.user_topics = {}  # 内存缓存
 
         if user_id not in handle_tg_message.user_emotions:
-            handle_tg_message.user_emotions[user_id] = EmotionEngine()
+            emotion_engine = EmotionEngine()
+            # 从数据库加载情绪状态
+            from models.database import get_emotion
+            db_emotion = get_emotion(user_id, persona_id)
+            emotion_engine.current_emotion = db_emotion.get("emotion", "neutral")
+            emotion_engine.intensity = db_emotion.get("intensity", 0)
+            handle_tg_message.user_emotions[user_id] = emotion_engine
         if user_id not in handle_tg_message.user_memories:
             memory_system = MemorySystem()
 
             # 从数据库加载该用户的历史记忆（按人设ID查询）
             from models.database import get_memories
-            db_memories = get_memories(user_id, persona_id)  # 用persona_id而不是account_id
+            db_memories = get_memories(user_id, persona_id)
             for mem in db_memories:
                 from ai_engine.memory import Memory
                 memory_system.add_long_term(Memory(
@@ -327,6 +333,12 @@ async def handle_tg_message(account_id: int, message):
                 ))
 
             handle_tg_message.user_memories[user_id] = memory_system
+
+        # 加载话题（从数据库）
+        if user_id not in handle_tg_message.user_topics:
+            from models.database import get_topics
+            db_topics = get_topics(user_id, persona_id)
+            handle_tg_message.user_topics[user_id] = {topic: True for topic in db_topics}
 
         emotion_engine = handle_tg_message.user_emotions[user_id]
         memory_system = handle_tg_message.user_memories[user_id]
@@ -411,15 +423,38 @@ async def handle_tg_message(account_id: int, message):
                 save_user_memory(user_id, persona_id, mem)  # 用persona_id而不是account_id
                 memory_system.add_long_term(mem)
 
-            # 提取讨论话题
+            # 提取讨论话题（持久化到数据库）
             topic_extracted = await extract_topic(user_message, generator)
             if topic_extracted:
                 memory_system.add_topic(topic_extracted)
                 if user_id not in handle_tg_message.user_topics:
                     handle_tg_message.user_topics[user_id] = {}
                 handle_tg_message.user_topics[user_id][topic_extracted] = True
+                # 保存到数据库
+                from models.database import save_topic
+                save_topic(user_id, topic_extracted, persona_id)
 
             print(f"[TG-{account_id}] [{ai_emotion}] 已回复用户 {user_id}: {response[:30]}...")
+
+            # 持久化情绪状态到数据库
+            from models.database import update_emotion
+            update_emotion(
+                user_id=user_id,
+                emotion=emotion_engine.current_emotion,
+                intensity=emotion_engine.intensity,
+                triggered_by=user_message[:50],
+                persona_id=persona_id
+            )
+
+            # 持久化对话历史到数据库
+            from models.database import save_conversation
+            conversation_history = memory_system.short_term[-20:]  # 保存最近20条
+            save_conversation(
+                user_id=user_id,
+                platform="telegram",
+                messages=conversation_history,
+                persona_id=persona_id
+            )
         else:
             print(f"[TG-{account_id}] AI 未生成回复")
 

@@ -89,7 +89,17 @@ def init_db():
         c.execute("ALTER TABLE memories ADD COLUMN category TEXT DEFAULT 'general'")
     except:
         pass
-    
+
+    # 话题追踪表
+    c.execute("""CREATE TABLE IF NOT EXISTS topics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        persona_id INTEGER,
+        topic TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, persona_id, topic)
+    )""")
+
     # 情绪状态表
     c.execute("""CREATE TABLE IF NOT EXISTS emotions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -274,6 +284,34 @@ def save_user_memory(user_id: str, persona_id: int, memory):
 
     conn.commit()
     conn.close()
+
+# 话题相关
+def save_topic(user_id: str, topic: str, persona_id: int = None):
+    """保存用户讨论过的话题"""
+    conn = get_conn()
+    c = conn.cursor()
+    try:
+        c.execute("""INSERT OR IGNORE INTO topics (user_id, persona_id, topic)
+                     VALUES (?, ?, ?)""",
+                  (user_id, persona_id, topic))
+        conn.commit()
+    except:
+        pass
+    conn.close()
+
+def get_topics(user_id: str, persona_id: int = None) -> List[str]:
+    """获取用户讨论过的话题列表"""
+    conn = get_conn()
+    c = conn.cursor()
+    if persona_id:
+        c.execute("""SELECT topic FROM topics WHERE user_id = ? AND persona_id = ?
+                     ORDER BY created_at DESC""", (user_id, persona_id))
+    else:
+        c.execute("""SELECT topic FROM topics WHERE user_id = ?
+                     ORDER BY created_at DESC""", (user_id,))
+    rows = c.fetchall()
+    conn.close()
+    return [row[0] for row in rows]
 
 # 情绪相关
 def get_emotion(user_id: str, persona_id: int = None) -> dict:
